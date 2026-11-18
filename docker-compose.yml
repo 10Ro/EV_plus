@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: evmining-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ev_mining_db}
+      POSTGRES_USER: ${POSTGRES_USER:-evmining}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-evmining_secret}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-evmining} -d ${POSTGRES_DB:-ev_mining_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evmining-net
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: evmining-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evmining-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: evmining-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evmining-net
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  redis_data:
+
+networks:
+  evmining-net:
+    driver: bridge
