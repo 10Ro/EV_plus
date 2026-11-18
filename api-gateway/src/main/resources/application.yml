@@ -5,6 +5,20 @@ spring:
   application:
     name: api-gateway
 
+services:
+  ingestion:
+    url: ${INGESTION_SERVICE_URL:http://localhost:8081}
+  processing:
+    url: ${PROCESSING_SERVICE_URL:http://localhost:8082}
+  mining:
+    url: ${MINING_SERVICE_URL:http://localhost:8083}
+  orchestrator:
+    url: ${ORCHESTRATOR_SERVICE_URL:http://localhost:8084}
+  results:
+    url: ${RESULTS_SERVICE_URL:http://localhost:8085}
+  monitoring:
+    url: ${MONITORING_SERVICE_URL:http://localhost:8086}
+
 management:
   endpoints:
     web:
