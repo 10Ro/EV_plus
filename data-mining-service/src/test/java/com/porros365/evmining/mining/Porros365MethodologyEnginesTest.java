@@ -76,7 +76,7 @@ class Porros365MethodologyEnginesTest {
         MarketOddsRecordDto bosniaRomania = new MarketOddsRecordDto(
                 "POST11_BOSNIA_ROMANIA", "FOOTBALL", "UEFA Nations League", "Bosnia vs Rumania",
                 "MATCH_ODDS_1X2", "1X2", "Gana Rumania", "BETFAIR_EXCHANGE",
-                4.13, 1.97, 3.63, "PAF", 4.60, 3.44, "LOST",
+                4.11, 1.98, 3.63, "PAF", 4.60, 3.44, "LOST",
                 null, null, null, null, null, null, null, null, null, null, null, null, null
         );
 
