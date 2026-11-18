@@ -1,0 +1,791 @@
+openapi: 3.0.3
+info:
+  title: EV+ & CLV Distributed Data Mining Platform API
+  description: >
+    API REST del Sistema Distribuido de Data Mining basado en la metodología de Valor Esperado (EV+)
+    y Closing Line Value (CLV) de @Porros365.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: API Gateway (Spring Cloud Gateway)
+tags:
+  - name: Auth
+    description: Autenticación JWT y gestión de sesión
+  - name: Datasets
+    description: Ingestión y versionado de datasets de cuotas Sharp y Soft (Data Ingestion Service)
+  - name: Workflows
+    description: Metodología EV+/CLV, fichas técnicas de los 6 pasos y algoritmos
+  - name: Executions
+    description: Orquestación de ejecuciones completas, por paso individual, cancelación y reintentos
+  - name: Results
+    description: Consulta de resultados de minería, comparación de ejecuciones y exportación
+  - name: Monitoring
+    description: Logs distribuidos, métricas y salud de los microservicios
+paths:
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Autenticación de usuario mediante credenciales
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Token JWT emitido correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Credenciales inválidas
+
+  /api/datasets:
+    get:
+      tags: [Datasets]
+      summary: Lista todos los datasets y sus versiones disponibles
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de datasets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DatasetSummaryDto'
+    post:
+      tags: [Datasets]
+      summary: Importa un nuevo dataset de cuotas (JSON o CSV) y crea su DatasetVersion v1
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDatasetRequest'
+      responses:
+        '201':
+          description: Dataset importado y versionado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetSummaryDto'
+        '400':
+          description: Error de validación en las cuotas o esquema del dataset
+
+  /api/datasets/{datasetId}/versions/{versionId}:
+    get:
+      tags: [Datasets]
+      summary: Obtiene el detalle, registros y estadísticas de una versión de dataset
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: datasetId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Versión del dataset con sus registros
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetVersionDetailDto'
+
+  /api/workflows:
+    get:
+      tags: [Workflows]
+      summary: Lista los workflows de metodología disponibles
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de workflows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkflowDto'
+    post:
+      tags: [Workflows]
+      summary: Crea o registra una nueva configuración/versión de workflow
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkflowRequest'
+      responses:
+        '201':
+          description: Workflow registrado
+
+  /api/workflows/{workflowId}/steps:
+    get:
+      tags: [Workflows]
+      summary: Obtiene las fichas técnicas detalladas de los 6 pasos de la metodología
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Fichas técnicas de los 6 pasos ordenadas secuencialmente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkflowStepSheetDto'
+
+  /api/executions:
+    get:
+      tags: [Executions]
+      summary: Consulta el historial completo de ejecuciones
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de ejecuciones con su estado y trazabilidad
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExecutionDto'
+    post:
+      tags: [Executions]
+      summary: Crea una nueva ejecución vinculada a un DatasetVersion y Configuration
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExecutionRequest'
+      responses:
+        '201':
+          description: Ejecución inicializada en estado PENDING con sus 6 StepExecutions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionDto'
+
+  /api/executions/{executionId}:
+    get:
+      tags: [Executions]
+      summary: Obtiene el estado detallado de una ejecución y de sus 6 pasos
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Estado completo de la ejecución
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionDto'
+
+  /api/executions/{executionId}/run:
+    post:
+      tags: [Executions]
+      summary: Ejecuta secuencialmente todos los pasos del pipeline (Pasos 1 a 6)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Ejecución completa iniciada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionDto'
+
+  /api/executions/{executionId}/steps/{stepNumber}/run:
+    post:
+      tags: [Executions]
+      summary: Ejecuta un paso individual verificando dependencias previas (o en modo independiente)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: stepNumber
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 6
+        - name: independentMode
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Si es true, permite ejecutar el paso sin que el paso anterior esté COMPLETED
+      responses:
+        '202':
+          description: Ejecución del paso aceptada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StepExecutionDto'
+        '409':
+          description: Dependencia no completada y modo independiente deshabilitado
+
+  /api/executions/{executionId}/cancel:
+    post:
+      tags: [Executions]
+      summary: Pausa o cancela una ejecución en curso
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ejecución marcada como CANCELLED
+
+  /api/executions/{executionId}/steps/{stepNumber}/retry:
+    post:
+      tags: [Executions]
+      summary: Repite un paso fallido o cancelado conservando trazabilidad de intentos
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: stepNumber
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 6
+      responses:
+        '202':
+          description: Reintento del paso iniciado
+
+  /api/executions/{executionId}/results:
+    get:
+      tags: [Results]
+      summary: Consulta los resultados de Data Mining de cada fase de la ejecución
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Resultados analíticos por paso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MiningResultDto'
+
+  /api/executions/{executionId}/logs:
+    get:
+      tags: [Monitoring]
+      summary: Consulta todos los logs y eventos de trazabilidad de una ejecución
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lista cronológica de logs de la ejecución
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExecutionLogDto'
+
+  /api/executions/compare:
+    get:
+      tags: [Results]
+      summary: Compara dos ejecuciones distintas (parámetros, métricas EV+, CLV y simulación)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: first
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: second
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Informe comparativo entre ambas ejecuciones
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionComparisonDto'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          example: Porros365!2026
+    LoginResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          example: Bearer
+        username:
+          type: string
+        role:
+          type: string
+          enum: [ROLE_ADMIN, ROLE_ANALYST, ROLE_VIEWER]
+        expiresInSeconds:
+          type: integer
+    MarketOddsRecordDto:
+      type: object
+      required:
+        - eventId
+        - eventName
+        - marketType
+        - selectionName
+        - sharpBookmaker
+        - sharpOddsSelection
+        - sharpOddsOpposite
+        - softBookmaker
+        - softTakenOdds
+      properties:
+        eventId:
+          type: string
+        sport:
+          type: string
+        competition:
+          type: string
+        eventName:
+          type: string
+        marketType:
+          type: string
+          enum: [ASIAN_HANDICAP, MATCH_ODDS_1X2, OVER_UNDER]
+        marketLine:
+          type: string
+        selectionName:
+          type: string
+        sharpBookmaker:
+          type: string
+        sharpOddsSelection:
+          type: number
+          format: double
+        sharpOddsOpposite:
+          type: number
+          format: double
+        sharpOddsDraw:
+          type: number
+          format: double
+          nullable: true
+        softBookmaker:
+          type: string
+        softTakenOdds:
+          type: number
+          format: double
+        closingFairOdds:
+          type: number
+          format: double
+          nullable: true
+        outcomeStatus:
+          type: string
+          enum: [WON, LOST, VOID, PENDING]
+    CreateDatasetRequest:
+      type: object
+      required: [name, sourceType, records]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        sourceType:
+          type: string
+          enum: [CSV, JSON, API_PAYLOAD]
+        sourceReference:
+          type: string
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketOddsRecordDto'
+    DatasetSummaryDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        sourceType:
+          type: string
+        latestVersionId:
+          type: string
+          format: uuid
+        latestVersionNumber:
+          type: integer
+        recordCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+    DatasetVersionDetailDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        datasetId:
+          type: string
+          format: uuid
+        versionNumber:
+          type: integer
+        stageType:
+          type: string
+        recordCount:
+          type: integer
+        checksumSha256:
+          type: string
+        summaryStats:
+          type: object
+        records:
+          type: array
+          items:
+            type: object
+        createdAt:
+          type: string
+          format: date-time
+    WorkflowDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        methodologyVersion:
+          type: string
+        sourceThreadUrl:
+          type: string
+        description:
+          type: string
+    CreateWorkflowRequest:
+      type: object
+      required: [code, name, methodologyVersion]
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        methodologyVersion:
+          type: string
+        description:
+          type: string
+    WorkflowStepSheetDto:
+      type: object
+      properties:
+        stepNumber:
+          type: integer
+        stepCode:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        objective:
+          type: string
+        targetService:
+          type: string
+        algorithmCode:
+          type: string
+        dependsOnStepNumber:
+          type: integer
+          nullable: true
+        inputContract:
+          type: object
+        outputContract:
+          type: object
+        defaultParameters:
+          type: object
+        validationCriteria:
+          type: array
+          items:
+            type: string
+        possibleErrors:
+          type: array
+          items:
+            type: string
+        expectedResults:
+          type: string
+    CreateExecutionRequest:
+      type: object
+      required: [workflowId, datasetVersionId]
+      properties:
+        workflowId:
+          type: string
+          format: uuid
+        datasetVersionId:
+          type: string
+          format: uuid
+        configurationName:
+          type: string
+        randomSeed:
+          type: integer
+          format: int64
+          default: 42
+        globalParameters:
+          type: object
+        stepOverrides:
+          type: object
+    StepExecutionDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        stepNumber:
+          type: integer
+        stepCode:
+          type: string
+        stepName:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, RUNNING, COMPLETED, FAILED, CANCELLED]
+        independentMode:
+          type: boolean
+        attemptNumber:
+          type: integer
+        algorithmVersion:
+          type: string
+        inputDatasetVersionId:
+          type: string
+          format: uuid
+        outputDatasetVersionId:
+          type: string
+          format: uuid
+          nullable: true
+        randomSeed:
+          type: integer
+          format: int64
+        parametersUsed:
+          type: object
+        outputSummary:
+          type: object
+        errorCode:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        durationMs:
+          type: integer
+          format: int64
+          nullable: true
+    ExecutionDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        workflowCode:
+          type: string
+        methodologyVersion:
+          type: string
+        initialDatasetVersionId:
+          type: string
+          format: uuid
+        currentDatasetVersionId:
+          type: string
+          format: uuid
+        configurationId:
+          type: string
+          format: uuid
+        codeVersion:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, RUNNING, COMPLETED, FAILED, CANCELLED]
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        durationMs:
+          type: integer
+          format: int64
+          nullable: true
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/StepExecutionDto'
+    MiningResultDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        executionId:
+          type: string
+          format: uuid
+        stepExecutionId:
+          type: string
+          format: uuid
+        stepNumber:
+          type: integer
+        datasetVersionId:
+          type: string
+          format: uuid
+        algorithmVersionId:
+          type: string
+          format: uuid
+        codeVersion:
+          type: string
+        randomSeed:
+          type: integer
+          format: int64
+        metricsSummary:
+          type: object
+        analyticalPayload:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+    ExecutionLogDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        executionId:
+          type: string
+          format: uuid
+        stepExecutionId:
+          type: string
+          format: uuid
+          nullable: true
+        stepNumber:
+          type: integer
+          nullable: true
+        serviceName:
+          type: string
+        level:
+          type: string
+          enum: [INFO, WARN, ERROR]
+        eventCode:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    ExecutionComparisonDto:
+      type: object
+      properties:
+        firstExecutionId:
+          type: string
+          format: uuid
+        secondExecutionId:
+          type: string
+          format: uuid
+        parameterDifferences:
+          type: object
+        metricDifferences:
+          type: object
+        summaryConclusion:
+          type: string
