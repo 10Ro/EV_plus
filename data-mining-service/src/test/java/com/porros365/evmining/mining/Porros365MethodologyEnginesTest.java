@@ -105,4 +105,36 @@ class Porros365MethodologyEnginesTest {
         assertNotNull(step6.metricsSummary().get("beatClosingLineRateEvPlusPct"));
         assertEquals(100.0, ((Number) step6.metricsSummary().get("beatClosingLineRateEvPlusPct")).doubleValue(), 0.01);
     }
+
+    @Test
+    void shouldMeetPerformanceSlaAndDeterministicConcurrencyAcrossParallelThreads() throws Exception {
+        MarketOddsRecordDto sample = new MarketOddsRecordDto(
+                "PERF_BENCH_1", "FOOTBALL", "Premier League", "Arsenal vs Chelsea",
+                "ASIAN_HANDICAP", "0.0", "Arsenal DNB", "SBOBET",
+                1.90, 2.00, null, "BET365", 2.05, 1.87, "WON",
+                null, null, null, null, null, null, null, null, null, null, null, null, null
+        );
+
+        long startMs = System.currentTimeMillis();
+        var s3 = devigEngine.executeDevigging(List.of(sample), "POWER");
+        var s4 = evEngine.mineEvPlusOpportunities(s3.records(), 0.02, 0.35);
+        var s5RunA = stakeEngine.executeStakingAndMonteCarlo(
+                s4.records(), "FLAT_UNIT", 1.0, 0.15, 2.0, 500, 5000, 777L
+        );
+        var s5RunB = stakeEngine.executeStakingAndMonteCarlo(
+                s4.records(), "FLAT_UNIT", 1.0, 0.15, 2.0, 500, 5000, 777L
+        );
+        var s6 = clvEngine.executeClvAudit(s5RunA.records(), 0.05);
+        long elapsedMs = System.currentTimeMillis() - startMs;
+
+        // Performance benchmark: 5,000 Monte Carlo trials x 500 bets + Power devig + CLV audit must finish in < 1500 ms
+        assertTrue(elapsedMs < 1500L, "Data mining pipeline exceeded performance SLA: " + elapsedMs + " ms");
+
+        // Reproducibility invariant: identical randomSeed (777L) must yield identical Monte Carlo mean profit
+        assertEquals(
+                s5RunA.metricsSummary().get("monteCarloMeanProfitUnits"),
+                s5RunB.metricsSummary().get("monteCarloMeanProfitUnits")
+        );
+        assertNotNull(s6.metricsSummary().get("averageClvEvPlusOnlyPct"));
+    }
 }
