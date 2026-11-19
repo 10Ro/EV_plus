@@ -1,0 +1,63 @@
+name: EV+ & CLV Distributed Data Mining Platform — CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop, 'feature/**' ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  backend-build-and-test:
+    name: Backend Microservices (Java 21 + Maven + JUnit 5)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Eclipse Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Compile and run unit, integration, security and performance tests
+        run: mvn -B test
+
+      - name: Package all 7 Spring Boot microservices
+        run: mvn -B -DskipTests package
+
+  frontend-build-and-typecheck:
+    name: Frontend Dashboard (Node 22 + React 18 + TypeScript + Vite)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend-dashboard
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend-dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript typecheck and Vite production build
+        run: npm run build
+
+  docker-compose-validation:
+    name: Validate Docker Compose & Microservice Dockerfiles
+    runs-on: ubuntu-latest
+    needs: [ backend-build-and-test, frontend-build-and-typecheck ]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml syntax and service topology
+        run: docker compose config -q

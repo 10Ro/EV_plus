@@ -52,6 +52,235 @@ services:
     networks:
       - evmining-net
 
+  data-ingestion-service:
+    build:
+      context: .
+      dockerfile: data-ingestion-service/Dockerfile
+    container_name: evmining-ingestion-service
+    environment:
+      SERVER_PORT: 8081
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ev_mining_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-evmining}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-evmining_secret}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evmining-net
+
+  data-processing-service:
+    build:
+      context: .
+      dockerfile: data-processing-service/Dockerfile
+    container_name: evmining-processing-service
+    environment:
+      SERVER_PORT: 8082
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ev_mining_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-evmining}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-evmining_secret}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+    ports:
+      - "8082:8082"
+    depends_on:
+      data-ingestion-service:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evmining-net
+
+  data-mining-service:
+    build:
+      context: .
+      dockerfile: data-mining-service/Dockerfile
+    container_name: evmining-mining-service
+    environment:
+      SERVER_PORT: 8083
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ev_mining_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-evmining}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-evmining_secret}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+    ports:
+      - "8083:8083"
+    depends_on:
+      data-ingestion-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evmining-net
+
+  workflow-orchestrator-service:
+    build:
+      context: .
+      dockerfile: workflow-orchestrator-service/Dockerfile
+    container_name: evmining-orchestrator-service
+    environment:
+      SERVER_PORT: 8084
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ev_mining_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-evmining}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-evmining_secret}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+      JWT_SECRET: ${JWT_SECRET:-Porros365EvPlusClvMiningDistributedPlatformSecretKey2026_HMAC_256!}
+    ports:
+      - "8084:8084"
+    depends_on:
+      data-ingestion-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evmining-net
+
+  results-service:
+    build:
+      context: .
+      dockerfile: results-service/Dockerfile
+    container_name: evmining-results-service
+    environment:
+      SERVER_PORT: 8085
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ev_mining_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-evmining}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-evmining_secret}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+    ports:
+      - "8085:8085"
+    depends_on:
+      data-ingestion-service:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evmining-net
+
+  monitoring-service:
+    build:
+      context: .
+      dockerfile: monitoring-service/Dockerfile
+    container_name: evmining-monitoring-service
+    environment:
+      SERVER_PORT: 8086
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ev_mining_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-evmining}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-evmining_secret}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+    ports:
+      - "8086:8086"
+    depends_on:
+      data-ingestion-service:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evmining-net
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: evmining-api-gateway
+    environment:
+      SERVER_PORT: 8080
+      INGESTION_SERVICE_URL: http://data-ingestion-service:8081
+      PROCESSING_SERVICE_URL: http://data-processing-service:8082
+      MINING_SERVICE_URL: http://data-mining-service:8083
+      ORCHESTRATOR_SERVICE_URL: http://workflow-orchestrator-service:8084
+      RESULTS_SERVICE_URL: http://results-service:8085
+      MONITORING_SERVICE_URL: http://monitoring-service:8086
+      JWT_SECRET: ${JWT_SECRET:-Porros365EvPlusClvMiningDistributedPlatformSecretKey2026_HMAC_256!}
+    ports:
+      - "8080:8080"
+    depends_on:
+      workflow-orchestrator-service:
+        condition: service_healthy
+      data-mining-service:
+        condition: service_healthy
+      results-service:
+        condition: service_healthy
+      monitoring-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evmining-net
+
+  frontend-dashboard:
+    build:
+      context: ./frontend-dashboard
+      dockerfile: Dockerfile
+    container_name: evmining-frontend-dashboard
+    ports:
+      - "3000:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - evmining-net
+
 volumes:
   postgres_data:
   rabbitmq_data:
