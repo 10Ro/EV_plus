@@ -13,7 +13,7 @@
 
     <groupId>com.porros365.evmining</groupId>
     <artifactId>ev-clv-mining-platform</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <packaging>pom</packaging>
     <name>EV+ &amp; CLV Distributed Data Mining Platform</name>
     <description>Sistema distribuido de Data Mining con Java 21 y Spring Boot 3 basado en la metodologia EV+ y CLV de @Porros365</description>
